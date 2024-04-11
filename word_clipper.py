@@ -7,6 +7,7 @@ import io
 import cssutils
 from docx.shared import Pt, Inches, Length
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+import streamlit as st
 
 def fetch_and_apply_header_styles(document, heading, css_string):
     style_sheet = cssutils.parseString(css_string)
@@ -269,8 +270,27 @@ def convert_to_word_spacing(css_value):
     # Add more conversions if necessary
     return None
 
-# Example usage
+
+def main():
+    st.title("Article Processor")
+    url = st.text_input("Enter the URL of the article:")
+    keyword = st.text_input("Enter the keyword to search within the article:")
+    
+    # Button to trigger the processing
+    if st.button("Generate Document"):
+        if url and keyword:  # Check if inputs are not empty
+            # Call your existing function to process the article and generate the Word document
+            doc_path = create_word_document_with_article_and_images(url, keyword)
+            # Allow the user to download the result
+            with open(doc_path, "rb") as file:
+                btn = st.download_button(
+                    label="Download Word Document",
+                    data=file,
+                    file_name="article_with_images.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+        else:
+            st.warning("Please enter both a URL and a keyword to proceed.")
+
 if __name__ == "__main__":
-    url = input("Enter the URL of the article: ")
-    keyword = input("Enter the keyword to search within the article: ")
-    create_word_document_with_article_and_images(url, keyword)
+    main()
