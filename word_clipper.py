@@ -149,17 +149,33 @@ def create_word_document_with_article_and_images(url, keyword):
     heading, article_content, css_styles = fetch_article_content_and_styles(url)
 
     latest_image_url = None
-    
+
+    # Suppose fetch_article_content_and_styles returns BeautifulSoup content
+    soup = BeautifulSoup(article_content, 'html.parser')  # assuming article_content is HTML
+
     # Insert heading into the document using CSS styles
     if heading and css_styles:
         fetch_and_apply_header_styles(document, heading, css_styles)
 
-    for content in article_content:
-        if content.name == 'img':
-            if 'data-src' in content.attrs:
-                latest_image_url = content['data-src']
-            elif 'src' in content.attrs:
-                latest_image_url = content['src']
+    first_paragraph_included = False  # Flag to track if the first paragraph has been processed
+    for content in soup.find_all(True):  # True matches every tag
+        if content.name == 'p' and not first_paragraph_included:
+            # Always process the first paragraph regardless of the keyword
+            insert_styled_text_to_document(document, content, keyword=None)  # Pass None as keyword to ensure it's included
+            first_paragraph_included = True
+            continue  # Move to the next iteration
+
+        if (content.name == 'img' or
+                (content.name and 'class' in content.attrs and
+                 any(cls for cls in content['class'] if 'img' in cls or 'image' in cls)) or
+                content.find('img')):
+            # Look for the image source within the current tag or nested img tags
+            img_tag = content if content.name == 'img' else content.find('img')
+            if img_tag:
+                if 'data-src' in img_tag.attrs:
+                    latest_image_url = img_tag['data-src']
+                elif 'src' in img_tag.attrs:
+                    latest_image_url = img_tag['src']
             # Don't reset latest_image_url to None here; wait until a matching paragraph is found
         elif content.name in ['p', 'ul', 'ol']:
             content_text_lower = content.get_text().lower() if content.name == 'p' else ""
@@ -172,12 +188,12 @@ def create_word_document_with_article_and_images(url, keyword):
                     insert_image_to_document(document, resized_image)
                 latest_image_url = None  # Reset latest_image_url after inserting the image
             # Whether the paragraph contains the keyword or not, it gets processed here
-            insert_styled_text_to_document(document, content, keyword=keyword)  # Pass keyword argument
+            if first_paragraph_included:  # Only apply keyword filtering after the first paragraph
+                insert_styled_text_to_document(document, content, keyword=keyword)  # Pass keyword argument
 
-    document_path = 'article_with_images.docx'
+    document_path = f'{heading}.docx'
     document.save(document_path)
     print(f"Document saved as {document_path}")
-
 
 def apply_css_styles_to_header(document, heading, css_styles):
     # Example of parsing CSS styles and applying to header
@@ -196,7 +212,6 @@ def apply_css_styles_to_header(document, heading, css_styles):
                 run.font.name = font_family
             break
         
-
 def fetch_article_content_and_styles(url):
     print("Fetching article content and styles...")
     headers = {'User-Agent': 'Mozilla/5.0'}
@@ -209,7 +224,7 @@ def fetch_article_content_and_styles(url):
             noscript_tag.decompose()
         for mega_menu in soup.select('.mega-menu-main'):
             mega_menu.decompose()
-        for menu_item in soup.find_all('div', class_='menu'):
+        for menu_item in soup.find_all(lambda tag: tag.name and 'class' in tag.attrs and any('menu' in cls for cls in tag['class'])):
             menu_item.decompose()
         # Extract the heading
         heading = soup.find('h1').text.strip()  # Assuming the heading is in an <h1> tag
@@ -222,7 +237,7 @@ def fetch_article_content_and_styles(url):
              css_response = requests.get(css_url)
              if css_response.status_code == 200:
                  css_styles += css_response.text
-        article_content = soup.select('p, img, ul, ol')
+        article_content = ''.join(str(tag) for tag in soup.select('p, img, ul, ol'))
         # Here we have already removed mega-menu elements from the soup
         return heading, article_content, css_styles
     else:
@@ -255,5 +270,7 @@ def convert_to_word_spacing(css_value):
     return None
 
 # Example usage
-url = 'https://betches.com/jackson-hole-where-to-stay-what-to-do/'
-create_word_document_with_article_and_images(url, "Kemo Sabe")
+if __name__ == "__main__":
+    url = input("Enter the URL of the article: ")
+    keyword = input("Enter the keyword to search within the article: ")
+    create_word_document_with_article_and_images(url, keyword)
