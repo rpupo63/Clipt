@@ -145,57 +145,6 @@ def apply_text_styles(run, element):
     elif element.name in ['em', 'i']:
         run.italic = True
 
-def create_word_document_with_article_and_images(url, keyword):
-    document = Document()
-    heading, article_content, css_styles = fetch_article_content_and_styles(url)
-
-    latest_image_url = None
-
-    # Suppose fetch_article_content_and_styles returns BeautifulSoup content
-    soup = BeautifulSoup(article_content, 'html.parser')  # assuming article_content is HTML
-
-    # Insert heading into the document using CSS styles
-    if heading and css_styles:
-        fetch_and_apply_header_styles(document, heading, css_styles)
-
-    first_paragraph_included = False  # Flag to track if the first paragraph has been processed
-    for content in soup.find_all(True):  # True matches every tag
-        if content.name == 'p' and not first_paragraph_included:
-            # Always process the first paragraph regardless of the keyword
-            insert_styled_text_to_document(document, content, keyword=None)  # Pass None as keyword to ensure it's included
-            first_paragraph_included = True
-            continue  # Move to the next iteration
-
-        if (content.name == 'img' or
-                (content.name and 'class' in content.attrs and
-                 any(cls for cls in content['class'] if 'img' in cls or 'image' in cls)) or
-                content.find('img')):
-            # Look for the image source within the current tag or nested img tags
-            img_tag = content if content.name == 'img' else content.find('img')
-            if img_tag:
-                if 'data-src' in img_tag.attrs:
-                    latest_image_url = img_tag['data-src']
-                elif 'src' in img_tag.attrs:
-                    latest_image_url = img_tag['src']
-            # Don't reset latest_image_url to None here; wait until a matching paragraph is found
-        elif content.name in ['p', 'ul', 'ol']:
-            content_text_lower = content.get_text().lower() if content.name == 'p' else ""
-            keyword_lower = keyword.lower()
-            # Check for keyword in paragraph, and ensure we have an image to insert
-            if keyword_lower in content_text_lower and latest_image_url:
-                # Insert the image before the paragraph
-                resized_image = fetch_and_resize_image(latest_image_url, 400)
-                if resized_image:
-                    insert_image_to_document(document, resized_image)
-                latest_image_url = None  # Reset latest_image_url after inserting the image
-            # Whether the paragraph contains the keyword or not, it gets processed here
-            if first_paragraph_included:  # Only apply keyword filtering after the first paragraph
-                insert_styled_text_to_document(document, content, keyword=keyword)  # Pass keyword argument
-
-    document_path = f'{heading}.docx'
-    document.save(document_path)
-    print(f"Document saved as {document_path}")
-
 def apply_css_styles_to_header(document, heading, css_styles):
     # Example of parsing CSS styles and applying to header
     style_sheet = cssutils.parseString(css_styles)
@@ -271,26 +220,57 @@ def convert_to_word_spacing(css_value):
     return None
 
 
+def create_word_document_with_article_and_images(url, keyword):
+    document = Document()
+    heading, article_content, css_styles = fetch_article_content_and_styles(url)
+    
+    latest_image_url = None
+    soup = BeautifulSoup(article_content, 'html.parser')
+    first_paragraph_included = False
+    for content in soup.find_all(True):
+        if content.name == 'p' and not first_paragraph_included:
+            insert_styled_text_to_document(document, content, keyword=None)
+            first_paragraph_included = True
+            continue
+        
+        if 'img' in str(content):
+            img_tags = content.find_all('img')
+            for img_tag in img_tags:
+                if 'src' in img_tag.attrs:
+                    latest_image_url = img_tag['src']
+                elif 'data-src' in img_tag.attrs:
+                    latest_image_url = img_tag['data-src']
+        
+        if content.name in ['p', 'ul', 'ol'] and latest_image_url:
+            content_text = content.get_text().lower()
+            if keyword.lower() in content_text:
+                resized_image = fetch_and_resize_image(latest_image_url, 400)
+                if resized_image:
+                    insert_image_to_document(document, resized_image)
+                latest_image_url = None
+            if first_paragraph_included:
+                insert_styled_text_to_document(document, content, keyword=keyword if keyword.lower() in content_text else None)
+
+    docx_stream = BytesIO()
+    document.save(docx_stream)
+    docx_stream.seek(0)
+    return docx_stream, f"{heading}.docx"
+
+# Streamlit app
 def main():
-    st.title("Article Processor")
+    st.title("Article to Word Document Converter")
     url = st.text_input("Enter the URL of the article:")
     keyword = st.text_input("Enter the keyword to search within the article:")
     
-    # Button to trigger the processing
     if st.button("Generate Document"):
-        if url and keyword:  # Check if inputs are not empty
-            # Call your existing function to process the article and generate the Word document
-            doc_path = create_word_document_with_article_and_images(url, keyword)
-            # Allow the user to download the result
-            with open(doc_path, "rb") as file:
-                btn = st.download_button(
-                    label="Download Word Document",
-                    data=file,
-                    file_name="article_with_images.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
+        if url and keyword:
+            docx_stream, filename = create_word_document_with_article_and_images(url, keyword)
+            st.download_button(label="Download Word Document",
+                               data=docx_stream,
+                               file_name=filename,
+                               mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         else:
-            st.warning("Please enter both a URL and a keyword to proceed.")
+            st.warning("Please enter both a URL and a keyword.")
 
 if __name__ == "__main__":
     main()
