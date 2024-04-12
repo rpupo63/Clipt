@@ -220,7 +220,7 @@ def convert_to_word_spacing(css_value):
     return None
 
 
-def create_word_document_with_article_and_images(url, keyword):
+def create_word_document_with_article_and_images(url, keyword=None):
     document = Document()
     heading, article_content, css_styles = fetch_article_content_and_styles(url)
     
@@ -229,7 +229,7 @@ def create_word_document_with_article_and_images(url, keyword):
     first_paragraph_included = False
     for content in soup.find_all(True):
         if content.name == 'p' and not first_paragraph_included:
-            insert_styled_text_to_document(document, content, keyword=None)
+            insert_styled_text_to_document(document, content)
             first_paragraph_included = True
             continue
         
@@ -243,34 +243,36 @@ def create_word_document_with_article_and_images(url, keyword):
         
         if content.name in ['p', 'ul', 'ol'] and latest_image_url:
             content_text = content.get_text().lower()
-            if keyword.lower() in content_text:
+            if keyword and keyword.lower() in content_text:
                 resized_image = fetch_and_resize_image(latest_image_url, 400)
                 if resized_image:
                     insert_image_to_document(document, resized_image)
                 latest_image_url = None
             if first_paragraph_included:
-                insert_styled_text_to_document(document, content, keyword=keyword if keyword.lower() in content_text else None)
+                insert_styled_text_to_document(document, content, keyword=keyword if keyword and keyword.lower() in content_text else None)
 
-    docx_stream = BytesIO()
+    docx_stream = io.BytesIO()
     document.save(docx_stream)
     docx_stream.seek(0)
     return docx_stream, f"{heading}.docx"
 
 # Streamlit app
 def main():
+    import streamlit as st
+    
     st.title("Article to Word Document Converter")
     url = st.text_input("Enter the URL of the article:")
-    keyword = st.text_input("Enter the keyword to search within the article:")
+    keyword = st.text_input("Enter the keyword to search within the article:", "")
     
     if st.button("Generate Document"):
-        if url and keyword:
-            docx_stream, filename = create_word_document_with_article_and_images(url, keyword)
+        if url:
+            docx_stream, filename = create_word_document_with_article_and_images(url, keyword if keyword else None)
             st.download_button(label="Download Word Document",
                                data=docx_stream,
                                file_name=filename,
                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         else:
-            st.warning("Please enter both a URL and a keyword.")
+            st.warning("Please enter the URL of the article.")
 
 if __name__ == "__main__":
     main()
