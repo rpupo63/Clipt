@@ -1,0 +1,94 @@
+
+def resize_image_to_same_height(image_data, target_height=300):
+    # Try to detect if the image is an SVG by looking at the first few bytes
+    if image_data[:5].lower() == b'<?xml' or b'<svg' in image_data[:50].lower():
+        # Parse the SVG data
+        tree = ET.ElementTree(ET.fromstring(image_data))
+        svg = tree.getroot()
+        # Check for viewBox attribute
+        viewBox = svg.get('viewBox')
+        if viewBox:
+            _, _, vb_width, vb_height = map(float, viewBox.split())
+        else:
+            vb_width = vb_height = None
+
+        width = svg.get('width')
+        height = svg.get('height')
+        
+        if width and height:
+            original_width = float(width.strip('px'))
+            original_height = float(height.strip('px'))
+        elif vb_width and vb_height:
+            original_width, original_height = vb_width, vb_height
+        else:
+            raise ValueError("SVG does not have sufficient information for resizing (no width/height or viewBox)")
+
+        # Calculate new dimensions
+        scale_ratio = target_height / original_height
+        new_width = int(original_width * scale_ratio)
+
+        # Set new width and height
+        svg.set('width', f"{new_width}px")
+        svg.set('height', f"{target_height}px")
+
+        # Convert tree back to bytes
+        output = io.BytesIO()
+        tree.write(output, encoding='utf-8', xml_declaration=True)
+        return output.getvalue()
+    else:
+        # Handle raster images
+        img = Image.open(io.BytesIO(image_data))
+        original_width, original_height = img.size
+        scale_ratio = target_height / original_height
+        new_width = int(original_width * scale_ratio)
+        resized_img = img.resize((new_width, target_height), Image.Resampling.LANCZOS)
+        output = io.BytesIO()
+        img_format = 'PNG' if img.format == 'JPEG' else img.format
+        resized_img.save(output, format=img_format)
+        return output.getvalue()
+
+
+
+
+
+
+def main():
+    st.title("URL to Markdown Converter")
+    
+    # Streamlit widgets for user inputs
+    url = st.text_input("Enter the URL to convert to Markdown:")
+                        #value="https://thedieline.com/blog/2024/3/13/knesko-skin-green-jade")
+    keyword = st.text_input("Enter the keyword:", value="")
+    output_type = st.selectbox("Select the type of file:", options=['markdown', 'pdf'], index=0)
+    output_filename = st.text_input("Enter the output Markdown file name:", value="output.md")
+    
+    # Button to trigger conversion
+    convert_button = st.button("Convert URL to Markdown")
+    
+    if convert_button:
+        markdown_text = url_to_markdown(url=url, keyword=keyword, output_file=output_filename)
+        
+        if markdown_text is not None:
+            # Show Markdown text in Streamlit app
+            st.text_area("Markdown Text", markdown_text, height=250)
+            
+            # Save output to a file
+            full_filename = f"{output_filename}.{output_type}"
+            save_output(markdown_text, full_filename, output_type)
+            
+            # Create a link for downloading the output file
+            with open(full_filename, "rb") as file:
+                btn = st.download_button(
+                    label="Download file",
+                    data=file,
+                    file_name=full_filename,
+                    mime="text/markdown" if output_type == 'markdown' else "application/pdf"
+                )
+            if btn:
+                st.success("File downloaded successfully!")
+
+if __name__ == "__main__":
+    main()
+
+
+
