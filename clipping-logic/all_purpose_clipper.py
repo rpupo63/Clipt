@@ -14,9 +14,6 @@ from io import BytesIO, StringIO
 import base64
 import re
 import xml.etree.ElementTree as ET
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-import pdfkit
 import subprocess
 import streamlit as st
 import tempfile
@@ -313,19 +310,6 @@ def primary_func(url, keyword, output_type, output_name):
         print("No common div found.")
     log_time("End primary_func")
 
-if __name__ == "__main__":
-    url = input("Enter the URL to clip: ")
-    url = url if url else "https://www.cntraveler.com/gallery/best-hotels-in-san-diego"
-    keyword = input("Enter the keyword: ")
-    keyword = keyword if keyword else ''
-    output_type = input("Enter the type of file: ")
-    output_type = output_type if output_type else 'pdf'
-    output_filename = input("Enter the output file name (default 'output.pdf'): ")
-    output_filename = output_filename if output_filename else 'output'
-    primary_func(url=url, keyword=keyword, output_name=output_filename, output_type=output_type)
-
-"""
-# Streamlit web interface
 st.title('Clipt')
 
 url = st.text_input("Enter the URL to clip:", "https://thedieline.com/blog/2024/3/13/knesko-skin-green-jade")
@@ -342,4 +326,3 @@ if st.button('Process URL'):
             file_name=f'{output_filename}.{output_type}',
             mime="application/pdf"
         )
-"""
