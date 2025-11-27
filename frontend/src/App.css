@@ -150,6 +150,14 @@ body {
   border: 1px solid #a7f3d0;
 }
 
+.submit-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
 .submit-button {
   padding: 14px 24px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -164,7 +172,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-top: 8px;
+  flex: 1;
+  min-width: 200px;
 }
 
 .submit-button:hover:not(:disabled) {
@@ -180,6 +189,44 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+.filetype-select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 180px;
+}
+
+.filetype-label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.filetype-select {
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s;
+  font-family: inherit;
+  flex: 1;
+  cursor: pointer;
+  background-color: white;
+}
+
+.filetype-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.filetype-select:disabled {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .spinner {
@@ -215,6 +262,74 @@ body {
   border-radius: 4px;
   font-family: 'Courier New', monospace;
   font-size: 0.8rem;
+}
+
+.image-options-drawer {
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.image-options-drawer:hover {
+  border-color: #d1d5db;
+}
+
+.drawer-toggle {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: #f9fafb;
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.drawer-toggle:hover:not(:disabled) {
+  background-color: #f3f4f6;
+}
+
+.drawer-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.drawer-arrow {
+  transition: transform 0.2s;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.drawer-arrow.open {
+  transform: rotate(180deg);
+}
+
+.drawer-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  background-color: white;
+}
+
+.drawer-content.open {
+  max-height: 500px;
+  transition: max-height 0.3s ease-in;
+}
+
+.drawer-content .form-group {
+  padding: 16px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.drawer-content .form-group:last-child {
+  border-bottom: none;
 }
 
 @media (max-width: 640px) {

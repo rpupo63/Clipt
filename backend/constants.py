@@ -12,6 +12,10 @@ class ImageConfig:
     QUALITY = 85  # JPEG compression quality
     TIMEOUT = 30  # seconds for image download
     MAX_DIMENSION = 4000  # maximum width or height in pixels
+    
+    # Image styling constants for consistent formatting
+    CSS_CLASS = "content-image"  # CSS class for content images
+    CSS_STYLE = "display: block; margin: 20px auto; width: 33.333%; height: auto;"  # Inline styles: 1/3 screen width, centered, maintains aspect ratio
 
 
 # Page Scraping Configuration

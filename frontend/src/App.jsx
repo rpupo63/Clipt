@@ -6,6 +6,9 @@ function App() {
   const [filetype, setFiletype] = useState('html')
   const [keywords, setKeywords] = useState('')
   const [includeFirstParagraph, setIncludeFirstParagraph] = useState(false)
+  const [imageWidth, setImageWidth] = useState(33)
+  const [imagePosition, setImagePosition] = useState('center')
+  const [imageOptionsOpen, setImageOptionsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
@@ -27,7 +30,9 @@ function App() {
       const requestBody = {
         url: url,
         filetype: filetype,
-        return_file: true
+        return_file: true,
+        image_width: imageWidth,
+        image_position: imagePosition
       }
 
       // Add optional parameters only if they have values
@@ -107,21 +112,6 @@ function App() {
         </div>
 
         <div className="form-group">
-          <label htmlFor="filetype">Output Format</label>
-          <select
-            id="filetype"
-            value={filetype}
-            onChange={(e) => setFiletype(e.target.value)}
-            disabled={loading}
-          >
-            <option value="html">HTML</option>
-            <option value="pdf">PDF</option>
-            <option value="docx">DOCX</option>
-            <option value="md">Markdown</option>
-          </select>
-        </div>
-
-        <div className="form-group">
           <label htmlFor="keywords">
             Keywords (optional)
           </label>
@@ -153,6 +143,62 @@ function App() {
           </small>
         </div>
 
+        <div className="image-options-drawer">
+          <button
+            type="button"
+            className="drawer-toggle"
+            onClick={() => setImageOptionsOpen(!imageOptionsOpen)}
+            disabled={loading}
+          >
+            <span>Image Options</span>
+            <span className={`drawer-arrow ${imageOptionsOpen ? 'open' : ''}`}>▼</span>
+          </button>
+          
+          <div className={`drawer-content ${imageOptionsOpen ? 'open' : ''}`}>
+            <div className="form-group">
+              <label htmlFor="imageWidth">
+                Image Width (%)
+              </label>
+              <input
+                type="number"
+                id="imageWidth"
+                value={imageWidth}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value)
+                  if (!isNaN(value) && value >= 0 && value <= 100) {
+                    setImageWidth(value)
+                  }
+                }}
+                min="0"
+                max="100"
+                step="1"
+                placeholder="33"
+                disabled={loading}
+              />
+              <small className="help-text">
+                Width as percentage of container (0-100). Default: 33 (approximately 1/3 width)
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="imagePosition">Image Position</label>
+              <select
+                id="imagePosition"
+                value={imagePosition}
+                onChange={(e) => setImagePosition(e.target.value)}
+                disabled={loading}
+              >
+                <option value="center">Center</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+              </select>
+              <small className="help-text">
+                Position of images in the document
+              </small>
+            </div>
+          </div>
+        </div>
+
         {error && (
           <div className="message error-message">
             <strong>Error:</strong> {error}
@@ -165,28 +211,40 @@ function App() {
           </div>
         )}
 
-        <button
-          type="submit"
-          className="submit-button"
-          disabled={loading || !url}
-        >
-          {loading ? (
-            <>
-              <span className="spinner"></span>
-              Processing...
-            </>
-          ) : (
-            'Extract Content'
-          )}
-        </button>
+        <div className="submit-section">
+          <button
+            type="submit"
+            className="submit-button"
+            disabled={loading || !url}
+          >
+            {loading ? (
+              <>
+                <span className="spinner"></span>
+                Processing...
+              </>
+            ) : (
+              'Extract Content'
+            )}
+          </button>
+          
+          <div className="filetype-select-wrapper">
+            <label htmlFor="filetype" className="filetype-label">Format:</label>
+            <select
+              id="filetype"
+              value={filetype}
+              onChange={(e) => setFiletype(e.target.value)}
+              disabled={loading}
+              className="filetype-select"
+            >
+              <option value="html">HTML</option>
+              <option value="pdf">PDF</option>
+              <option value="docx">DOCX</option>
+              <option value="md">Markdown</option>
+            </select>
+          </div>
+        </div>
       </form>
 
-      <div className="footer">
-        <p>
-          Powered by Clipt API • Backend running on{' '}
-          <code>http://localhost:5000</code>
-        </p>
-      </div>
     </div>
   )
 }

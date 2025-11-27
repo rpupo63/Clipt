@@ -7,6 +7,9 @@ import ipaddress
 from urllib.parse import urlparse, urlunparse
 from typing import Optional
 from constants import SecurityConfig
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def normalize_image_url(url: str) -> str:
@@ -79,32 +82,43 @@ def validate_url(url: str, allow_private: bool = None) -> tuple[bool, Optional[s
 
         # Check scheme
         if parsed.scheme not in SecurityConfig.ALLOWED_URL_SCHEMES:
-            return False, f"Invalid URL scheme: {parsed.scheme}. Only HTTP/HTTPS allowed."
+            error_msg = f"Invalid URL scheme: {parsed.scheme}. Only HTTP/HTTPS allowed."
+            logger.warning(f"URL validation failed for {url}: {error_msg}")
+            return False, error_msg
 
         # Check for missing hostname
         if not parsed.hostname:
-            return False, "Invalid URL: missing hostname"
+            error_msg = "Invalid URL: missing hostname"
+            logger.warning(f"URL validation failed for {url}: {error_msg}")
+            return False, error_msg
 
         hostname = parsed.hostname.lower()
 
         # Check blocked hosts
         if hostname in SecurityConfig.BLOCKED_HOSTS:
-            return False, f"Access to {hostname} is not allowed"
+            error_msg = f"Access to {hostname} is not allowed"
+            logger.warning(f"SECURITY: Blocked access attempt to {hostname}")
+            return False, error_msg
 
         # Check for private IP ranges
         if not allow_private:
             try:
                 ip = ipaddress.ip_address(hostname)
                 if ip.is_private or ip.is_loopback or ip.is_link_local:
-                    return False, f"Access to private IP {hostname} is not allowed"
+                    error_msg = f"Access to private IP {hostname} is not allowed"
+                    logger.warning(f"SECURITY: Blocked access attempt to private IP {hostname}")
+                    return False, error_msg
             except ValueError:
                 # Not an IP address, it's a hostname - that's OK
                 pass
 
+        logger.debug(f"URL validation passed for {url}")
         return True, None
 
     except Exception as e:
-        return False, f"Invalid URL format: {str(e)}"
+        error_msg = f"Invalid URL format: {str(e)}"
+        logger.error(f"URL validation error for {url}: {e}", exc_info=True)
+        return False, error_msg
 
 
 def is_valid_http_url(url: str) -> bool:

@@ -8,6 +8,12 @@ from bs4 import BeautifulSoup, Tag, NavigableString
 from typing import Optional, Tuple, List
 import re
 
+# Import utilities
+from logger import get_logger
+from clean_content import clean_extracted_content
+
+logger = get_logger(__name__)
+
 
 def normalize_text(text: str) -> str:
     """
@@ -125,155 +131,69 @@ def find_common_container(element1: Tag, element2: Tag) -> Optional[Tag]:
     return None
 
 
-def filter_paragraphs_and_lists(
-    container: Tag,
-    keywords: Optional[List[str]] = None,
-    return_first_paragraph: bool = False
-) -> Tag:
-    """
-    Filter discrete content units (paragraphs, divs, lists, list items) within a container by keywords.
-    
-    A "paragraph" here means any discrete unit of content: <p>, <div>, <li>, <ul>, <ol>, etc.
-    If keywords are provided, only returns content units that contain at least one keyword.
-    If return_first_paragraph is True, always includes the first content unit regardless of keyword matching.
-    
-    Args:
-        container: The container Tag to filter
-        keywords: Optional list of keywords to filter by
-        return_first_paragraph: If True, always include first content unit (only useful if keywords provided)
-        
-    Returns:
-        A new Tag with filtered content (or original if no keywords provided)
-    """
-    # If no keywords provided, return all content units
-    if not keywords:
-        return container
-    
-    # Normalize keywords for comparison
-    normalized_keywords = [normalize_text(kw) for kw in keywords if kw]
-    if not normalized_keywords:
-        return container
-    
-    # Create a copy of the container to modify (to avoid modifying the original)
-    container_str = str(container)
-    filtered_soup = BeautifulSoup(container_str, 'html.parser')
-    
-    # Get the root element (should be the container tag)
-    # BeautifulSoup wraps the content, so we need to get the actual tag
-    if filtered_soup.contents:
-        container_tag = filtered_soup.contents[0] if isinstance(filtered_soup.contents[0], Tag) else None
-    else:
-        container_tag = None
-    
-    # If we couldn't get a proper tag, try to find it by name
-    if container_tag is None:
-        container_tag = filtered_soup.find(container.name)
-        if container_tag is None:
-            # Last resort: return original container
-            return container
-    
-    # Find all discrete content units: paragraphs, divs, list items, and lists
-    # These are treated as discrete units of content (any block-level element)
-    # BeautifulSoup's find_all returns elements in document order
-    content_units = container_tag.find_all(['p', 'div', 'li', 'ul', 'ol', 'article', 'section', 'blockquote'])
-    
-    # Get only top-level content units (not nested within another content unit)
-    # This ensures we filter at the right level and maintain HTML structure
-    top_level_units = []
-    for unit in content_units:
-        # Check if any parent (up to container_tag) is also a content unit
-        is_nested = False
-        parent = unit.parent
-        while parent and parent != container_tag:
-            if isinstance(parent, Tag) and parent.name in ['p', 'div', 'li', 'ul', 'ol', 'article', 'section', 'blockquote']:
-                is_nested = True
-                break
-            parent = parent.parent
-        if not is_nested:
-            top_level_units.append(unit)
-    
-    # Track first content unit for return_first_paragraph logic
-    # (already in document order from find_all)
-    first_unit = top_level_units[0] if top_level_units else None
-    
-    # Filter content units
-    for unit in top_level_units:
-        unit_text = normalize_text(unit.get_text())
-        contains_keyword = any(kw in unit_text for kw in normalized_keywords)
-        
-        # Always include first content unit if return_first_paragraph is True
-        if return_first_paragraph and unit is first_unit:
-            continue
-        
-        # Remove content unit if it doesn't contain any keyword
-        if not contains_keyword:
-            unit.decompose()
-    
-    # Return the filtered container tag
-    return container_tag
-
-
 def extract_content_between_sentences(
     html_content: str,
     first_sentence: str,
-    last_sentence: str,
-    keywords: Optional[List[str]] = None,
-    return_first_paragraph: bool = False
+    last_sentence: str
 ) -> Tuple[Optional[str], Optional[Tag]]:
     """
     Extract the smallest HTML container that contains both the first and last sentence.
-    Optionally filter paragraphs and lists by keywords.
-    
+
     Args:
         html_content: The full HTML content as a string
         first_sentence: The first sentence to find
         last_sentence: The last sentence to find
-        keywords: Optional list of keywords to filter paragraphs/lists by
-        return_first_paragraph: If True, always include first paragraph regardless of keywords
-        
+
     Returns:
         Tuple of (extracted HTML string, container Tag) or (None, None) if not found
     """
+    logger.debug("Extracting content between sentences")
     soup = BeautifulSoup(html_content, 'html.parser')
-    
+
     # Find elements containing each sentence
     first_element = find_element_containing_sentence(soup, first_sentence)
     if first_element is None:
+        logger.warning("Could not find element containing first sentence")
         return None, None
-    
+
+    logger.debug(f"Found first sentence in <{first_element.name}> element")
+
     last_element = find_element_containing_sentence(soup, last_sentence)
     if last_element is None:
+        logger.warning("Could not find element containing last sentence")
         return None, None
-    
+
+    logger.debug(f"Found last sentence in <{last_element.name}> element")
+
     # Find the smallest common container
     container = find_common_container(first_element, last_element)
     if container is None:
+        logger.warning("Could not find common container for sentences")
         return None, None
-    
-    # Apply keyword filtering if keywords are provided
-    if keywords:
-        container = filter_paragraphs_and_lists(container, keywords, return_first_paragraph)
-    
+
+    logger.debug(f"Found common container: <{container.name}>")
+
+    # Return container as HTML string
+    # Note: str(container) preserves all HTML attributes including:
+    # - Inline styles (style attribute)
+    # - CSS classes (class attribute)
+    # - IDs (id attribute)
+    # - All other HTML attributes
     return str(container), container
 
 
 def extract_from_file(
     filepath: str,
     first_sentence: str,
-    last_sentence: str,
-    keywords: Optional[List[str]] = None,
-    return_first_paragraph: bool = False
+    last_sentence: str
 ) -> Tuple[Optional[str], Optional[Tag]]:
     """
     Extract content from an HTML file between two sentences.
-    Optionally filter paragraphs and lists by keywords.
     
     Args:
         filepath: Path to the HTML file
         first_sentence: The first sentence to find
         last_sentence: The last sentence to find
-        keywords: Optional list of keywords to filter paragraphs/lists by
-        return_first_paragraph: If True, always include first paragraph regardless of keywords
         
     Returns:
         Tuple of (extracted HTML string, container Tag) or (None, None) if not found
@@ -284,9 +204,7 @@ def extract_from_file(
     return extract_content_between_sentences(
         html_content, 
         first_sentence, 
-        last_sentence,
-        keywords=keywords,
-        return_first_paragraph=return_first_paragraph
+        last_sentence
     )
 
 
@@ -309,43 +227,114 @@ def get_ancestors(element: Tag) -> List[Tag]:
     return ancestors
 
 
+def remove_padding_from_style(style: str) -> str:
+    """
+    Remove padding-related CSS properties from a style string.
+    
+    Args:
+        style: CSS style string (e.g., "padding: 10px; color: red;")
+        
+    Returns:
+        Style string with padding properties removed
+    """
+    if not style:
+        return ""
+    
+    # List of padding-related properties to remove
+    padding_properties = [
+        'padding',
+        'padding-top',
+        'padding-right',
+        'padding-bottom',
+        'padding-left'
+    ]
+    
+    # Split style string by semicolons
+    style_parts = [part.strip() for part in style.split(';')]
+    
+    # Filter out padding-related properties (case-insensitive)
+    filtered_parts = []
+    for part in style_parts:
+        if not part:
+            continue
+        # Check if this part starts with any padding property
+        is_padding = False
+        for prop in padding_properties:
+            if part.lower().startswith(prop.lower() + ':'):
+                is_padding = True
+                break
+        if not is_padding:
+            filtered_parts.append(part)
+    
+    # Rejoin the style parts
+    return '; '.join(filtered_parts) + (';' if filtered_parts else '')
+
+
+def remove_padding_from_container(container: Tag) -> None:
+    """
+    Remove padding from a container element's style attribute.
+    
+    Args:
+        container: BeautifulSoup Tag element to modify
+    """
+    if not container or not isinstance(container, Tag):
+        return
+    
+    style = container.get('style')
+    if style:
+        cleaned_style = remove_padding_from_style(style)
+        if cleaned_style.strip():
+            container['style'] = cleaned_style
+        else:
+            # Remove style attribute if it's now empty
+            del container['style']
+
+
 def extract_main_content(
     html_content: str,
     first_sentence: Optional[str] = None,
-    last_sentence: Optional[str] = None,
-    keywords: Optional[List[str]] = None,
-    include_first_paragraph: bool = False
+    last_sentence: Optional[str] = None
 ) -> str:
     """
-    Extract main content from HTML, optionally using first/last sentences and keyword filtering.
+    Extract main content from HTML, optionally using first/last sentences.
 
     If first_sentence and last_sentence are provided, extracts the smallest container
     containing both. Otherwise, attempts to extract the main content body.
+    
+    After extraction, removes secondary content like sidebars, ads, and trending sections.
 
     Args:
         html_content: The full HTML content as a string
         first_sentence: Optional first sentence to find
         last_sentence: Optional last sentence to find
-        keywords: Optional list of keywords to filter paragraphs/lists by
-        include_first_paragraph: If True, always include first paragraph regardless of keywords
 
     Returns:
-        Extracted HTML string
+        Extracted and cleaned HTML string
     """
+    logger.debug("Extracting main content from HTML")
+
     # If we have both first and last sentences, use the precise extraction
     if first_sentence and last_sentence:
+        logger.debug("Using AI-guided extraction with first/last sentences")
         extracted_html, container = extract_content_between_sentences(
             html_content,
             first_sentence,
-            last_sentence,
-            keywords=keywords,
-            return_first_paragraph=include_first_paragraph
+            last_sentence
         )
         if extracted_html:
-            return extracted_html
-        # If extraction failed, fall through to heuristic method
+            logger.info("Successfully extracted content using sentence boundaries")
+            # Remove padding from container if present
+            if container:
+                remove_padding_from_container(container)
+                # Re-extract HTML after removing padding
+                extracted_html = str(container)
+            # Clean the extracted content before returning
+            cleaned_html = clean_extracted_content(extracted_html)
+            return cleaned_html
+        logger.warning("Sentence-based extraction failed, falling back to heuristic method")
 
     # Fallback: Use heuristic approach to find main content
+    logger.debug("Using heuristic content extraction")
     soup = BeautifulSoup(html_content, 'html.parser')
 
     # Try to find main content area using common patterns
@@ -369,27 +358,32 @@ def extract_main_content(
         try:
             main_content = soup.select_one(selector)
             if main_content:
+                logger.debug(f"Found main content using selector: {selector}")
                 break
-        except:
+        except Exception as e:
+            logger.debug(f"Selector '{selector}' failed: {e}")
             continue
 
     # If no main content found, use body
     if not main_content:
+        logger.debug("No main content selector matched, using body element")
         main_content = soup.find('body')
 
     # If still nothing, use the whole soup
     if not main_content:
+        logger.warning("Could not find body element, using entire document")
         main_content = soup
 
-    # Apply keyword filtering if requested
-    if keywords:
-        main_content = filter_paragraphs_and_lists(
-            main_content,
-            keywords,
-            include_first_paragraph
-        )
-
-    return str(main_content)
+    logger.info("Main content extraction completed")
+    
+    # Clean the extracted content before returning
+    # Note: str(main_content) preserves all HTML attributes including:
+    # - Inline styles (style attribute)
+    # - CSS classes (class attribute)
+    # - IDs (id attribute)
+    # - All other HTML attributes
+    cleaned_html = clean_extracted_content(str(main_content))
+    return cleaned_html
 
 
 def main():
@@ -419,6 +413,9 @@ def main():
         print("Could not find a common container for the given sentences.")
         sys.exit(1)
     
+    # Clean the extracted content
+    cleaned_html = clean_extracted_content(extracted_html)
+    
     print(f"\nContainer tag: <{container.name}>")
     if container.get('class'):
         print(f"Container class: {container.get('class')}")
@@ -426,11 +423,11 @@ def main():
         print(f"Container id: {container.get('id')}")
     
     print("\n" + "=" * 80)
-    print("EXTRACTED HTML:")
+    print("EXTRACTED AND CLEANED HTML:")
     print("=" * 80 + "\n")
-    print(extracted_html)
+    print(cleaned_html)
     
-    return extracted_html
+    return cleaned_html
 
 
 if __name__ == "__main__":
