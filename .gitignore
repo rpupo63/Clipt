@@ -3,3 +3,12 @@ clipping-logic/clenv/
 # uBlock Origin extension (download separately)
 backend/uBlock0.chromium/
 *.env
+# Local agent overrides (not shared)
+CLAUDE.local.md
+
+# Claude Code local permissions (synced to .agents/permissions.json)
+.claude/settings.local.json
+
+# Python bytecode
+__pycache__/
+*.pyc
