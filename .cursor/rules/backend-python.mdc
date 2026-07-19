@@ -1,0 +1,11 @@
+---
+description: Clipt Python backend extraction conventions
+globs: ["backend/**/*.py"]
+alwaysApply: false
+---
+
+# Backend (Clipt)
+
+- Core modules: `clipping_logic.py`, `content_extraction.py`, `clean_content.py`, `dom_utils.py`.
+- Keep REST API handler signatures stable — see README "REST API".
+- Deps via `backend/requirements.txt` in a venv.

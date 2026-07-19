@@ -1,0 +1,10 @@
+---
+description: Clipt frontend conventions
+globs: ["frontend/**"]
+alwaysApply: false
+---
+
+# Frontend (Clipt)
+
+- Match existing frontend patterns; coordinate with backend export formats (HTML/DOCX/PDF/Markdown).
+- Prefer minimal UI changes unless the request is UI-focused.
